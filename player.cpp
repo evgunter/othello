@@ -41,3 +41,5 @@ Move *Player::doMove(Move *opponentsMove, int msLeft) {
      */ 
     return NULL;
 }
+
+//This will all be Haskell someday.
