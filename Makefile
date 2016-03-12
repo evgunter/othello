@@ -1,22 +1,27 @@
+HC         = ghc
+# STATIC_ARGS = -static -optl-static -optc-static -optl-pthread
+STATIC_ARGS =
+HFLAGS     = -O2 -Wall $(STATIC_ARGS) --make
+HMAKEEXEC  = $(HC) -o $@ $(HFLAGS)
+PLAYERNAME  = Sam # Random bland human names = best team names
+
 CC          = g++
 CFLAGS      = -Wall -ansi -pedantic -ggdb
-OBJS        = player.o board.o
-PLAYERNAME  = player
 
-all: $(PLAYERNAME) testgame
-	
-$(PLAYERNAME): $(OBJS) wrapper.o
-	$(CC) -o $@ $^
+all: $(PLAYERNAME) testgame testminimax
+
+$(PLAYERNAME): Player.hs
+	$(HMAKEEXEC) Player.hs
+
+testminimax:
+	$(HMAKEEXEC) TestMiniMax.hs
 
 testgame: testgame.o
 	$(CC) -o $@ $^
 
-testminimax: $(OBJS) testminimax.o
-	$(CC) -o $@ $^
-
 %.o: %.cpp
 	$(CC) -c $(CFLAGS) -x c++ $< -o $@
-	
+
 java:
 	make -C java/
 
@@ -25,5 +30,5 @@ cleanjava:
 
 clean:
 	rm -f *.o $(PLAYERNAME) testgame testminimax
-	
-.PHONY: java testminimax
+
+.PHONY: java
