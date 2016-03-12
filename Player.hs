@@ -1,4 +1,4 @@
-import Data.List (mapAccumL)
+import Data.List (mapAccumL, maximumBy)
 import GHC.Word (Word64)
 import Data.Bits --many things shall hail from here
 import System.Environment (getArgs, withArgs)
@@ -33,9 +33,29 @@ oneMove b m = (Board (setBit (filled newb) (processMove mym))
   where
     newb = Board (setBit (filled b) (processMove m))
                  (foldr (flip clearBit) (mine b) (flipped b m))
-    (mym, toFlip) = head' (validMoves newb)
-    head' [] = (Move (-1) (-1), []) -- pass
-    head' xs = (\(i, j) -> (boardPosToMyMove i, j))  (head xs)
+    (mym, toFlip) = pickMove currentStrategy (validMoves newb)
+
+pickMove :: ([(BoardPosIndex, [BoardPosIndex])] ->
+              (BoardPosIndex, [BoardPosIndex])) ->
+             [(BoardPosIndex, [BoardPosIndex])] -> (MyMove, [BoardPosIndex])
+pickMove _ [] = (Move (-1) (-1), []) -- pass
+pickMove f xs = (\(i, is) -> (boardPosToMyMove i, is)) $ f xs
+
+currentStrategy :: [(BoardPosIndex, [BoardPosIndex])] ->
+                    (BoardPosIndex, [BoardPosIndex])
+currentStrategy = pickMoveGreedy
+
+pickMoveSimple :: [(BoardPosIndex, [BoardPosIndex])] ->
+                   (BoardPosIndex, [BoardPosIndex])
+pickMoveSimple = head
+
+pickMoveGreedy :: [(BoardPosIndex, [BoardPosIndex])] ->
+                   (BoardPosIndex, [BoardPosIndex])
+pickMoveGreedy = maximumBy greedyBetterMove
+
+greedyBetterMove (a, as) (b, bs) | length as >  length bs = GT
+                                 | length as == length bs = EQ
+                                 | otherwise              = LT
 
 parseOneMove :: String -> (OpponentsMove, Time)
 parseOneMove = (\[l1, l2, l3] -> ((Move l1 l2), Time l3)) .
