@@ -43,19 +43,41 @@ pickMove f xs = (\(i, is) -> (boardPosToMyMove i, is)) $ f xs
 
 currentStrategy :: [(BoardPosIndex, [BoardPosIndex])] ->
                     (BoardPosIndex, [BoardPosIndex])
-currentStrategy = pickMoveGreedy
+currentStrategy = greedy
 
-pickMoveSimple :: [(BoardPosIndex, [BoardPosIndex])] ->
-                   (BoardPosIndex, [BoardPosIndex])
-pickMoveSimple = head
+simple :: [(BoardPosIndex, [BoardPosIndex])] ->
+           (BoardPosIndex, [BoardPosIndex])
+simple = head
 
-pickMoveGreedy :: [(BoardPosIndex, [BoardPosIndex])] ->
-                   (BoardPosIndex, [BoardPosIndex])
-pickMoveGreedy = maximumBy greedyBetterMove
+greedy :: [(BoardPosIndex, [BoardPosIndex])] ->
+           (BoardPosIndex, [BoardPosIndex])
+greedy = maximumBy best
+  where best (a, as) (b, bs) | length as >  length bs = GT
+                             | length as == length bs = EQ
+                             | otherwise              = LT
 
-greedyBetterMove (a, as) (b, bs) | length as >  length bs = GT
-                                 | length as == length bs = EQ
-                                 | otherwise              = LT
+greedyCorners :: [(BoardPosIndex, [BoardPosIndex])] ->
+                  (BoardPosIndex, [BoardPosIndex])
+greedyCorners = maximumBy best
+  where best (a, as) (b, bs) | a `elem` corners       = GT
+                             | b `elem` corners       = LT
+                             | a `elem` cornerDiag    = LT
+                             | b `elem` cornerDiag    = GT
+                             | a `elem` cornerEdge    = LT
+                             | b `elem` cornerEdge    = GT
+                             | length as >  length bs = GT
+                             | otherwise              = LT
+                             --no EQ because unnecessary
+
+corners :: [BoardPosIndex]
+corners = map (\(x, y) -> 8*y + x) [(0, 0), (0, 7), (7, 0), (7, 7)]
+
+cornerDiag :: [BoardPosIndex]
+cornerDiag = map (\(x, y) -> 8*y + x) [(1, 1), (1, 6), (6, 1), (6, 6)]
+
+cornerEdge :: [BoardPosIndex]
+cornerEdge = map (\(x, y) -> 8*y + x) [(0, 1), (1, 0), (0, 6), (6, 0), (1, 7),
+                                       (7, 1), (6, 7), (7, 6)]
 
 parseOneMove :: String -> (OpponentsMove, Time)
 parseOneMove = (\[l1, l2, l3] -> ((Move l1 l2), Time l3)) .
