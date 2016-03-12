@@ -1,5 +1,4 @@
-import Debug.Trace (trace)
-import Data.List (mapAccumL, maximumBy)
+import Data.List (mapAccumL)
 import GHC.Word (Word64)
 import Data.Bits --many things shall hail from here
 import System.Environment (getArgs, withArgs)
@@ -7,7 +6,7 @@ import System.IO (hSetBuffering, BufferMode (LineBuffering), stdout)
 import Data.Maybe (catMaybes)
 
 data Move = Move Int Int
-          deriving (Eq, Show)
+          deriving (Show)
 type OpponentsMove = Move
 type MyMove        = Move
 type BoardPosIndex = Int
@@ -19,80 +18,28 @@ main :: IO ()
 main = do
   hSetBuffering stdout LineBuffering
   [color] <- getArgs
-  {-
   let (board, initialOutput)
         | color == "Black" = (boardWFirstMove, formatMyMove firstMove ++ "\n")
         | otherwise        = (initialBoard, "")
   interact $ (("Sam is initialized.\n" ++ initialOutput) ++) .
     playString board
-  -}
-  let initBoard | color == "Black" = initialBBoard
-                | otherwise        = initialWBoard
-  interact $ ("Sam is initialized.\n" ++ ) . playString initBoard
-
+  
 -- applies opponents' and my moves
 oneMove :: Board -> OpponentsMove -> (Board, MyMove)
---oneMove b m = (Board (setBit (filled newb) (processMove mym))
-oneMove b m = trace ("oneMove: opponent: " ++ show m)
-              (Board (setMoveBit (filled newb) mym)
+oneMove b m = (Board (setBit (filled newb) (processMove mym))
                      (foldr (flip setBit)
---                            (setBit (mine newb) (processMove mym)) toFlip),
---               mym)
-                            (setMoveBit (mine newb) mym) toFlip),
-               (trace ("oneMove: mine: " ++ show mym) mym))
+                            (setBit (mine newb) (processMove mym)) toFlip),
+               mym)
   where
-    newb =  Board (setMoveBit (filled b)  m)
-                  (foldr (flip clearBit) (mine b) (flipped b m))
-    (mym, toFlip) = pickMove currentStrategy (validMoves newb)
-
-pickMove :: ([(BoardPosIndex, [BoardPosIndex])] ->
-              (BoardPosIndex, [BoardPosIndex])) ->
-             [(BoardPosIndex, [BoardPosIndex])] -> (MyMove, [BoardPosIndex])
-pickMove _ [] = (Move (-1) (-1), []) -- pass
-pickMove f xs = (\(i, is) -> (boardPosToMyMove i, is)) $ f xs
-
-currentStrategy :: [(BoardPosIndex, [BoardPosIndex])] ->
-                    (BoardPosIndex, [BoardPosIndex])
-currentStrategy = greedy
-
-simple :: [(BoardPosIndex, [BoardPosIndex])] ->
-           (BoardPosIndex, [BoardPosIndex])
-simple = head
-
-greedy :: [(BoardPosIndex, [BoardPosIndex])] ->
-           (BoardPosIndex, [BoardPosIndex])
-greedy = maximumBy best
-  where best (a, as) (b, bs) | length as >  length bs = GT
-                             | length as == length bs = EQ
-                             | otherwise              = LT
-
-greedyCorners :: [(BoardPosIndex, [BoardPosIndex])] ->
-                  (BoardPosIndex, [BoardPosIndex])
-greedyCorners = maximumBy best
-  where best (a, as) (b, bs) | a `elem` corners       = GT
-                             | b `elem` corners       = LT
-                             | a `elem` cornerDiag    = LT
-                             | b `elem` cornerDiag    = GT
-                             | a `elem` cornerEdge    = LT
-                             | b `elem` cornerEdge    = GT
-                             | length as >  length bs = GT
-                             | otherwise              = LT
-                             --no EQ because unnecessary
-
-corners :: [BoardPosIndex]
-corners = map (\(x, y) -> 8*y + x) [(0, 0), (0, 7), (7, 0), (7, 7)]
-
-cornerDiag :: [BoardPosIndex]
-cornerDiag = map (\(x, y) -> 8*y + x) [(1, 1), (1, 6), (6, 1), (6, 6)]
-
-cornerEdge :: [BoardPosIndex]
-cornerEdge = map (\(x, y) -> 8*y + x) [(0, 1), (1, 0), (0, 6), (6, 0), (1, 7),
-                                       (7, 1), (6, 7), (7, 6)]
+    newb = Board (setBit (filled b) (processMove m))
+                 (foldr (flip clearBit) (mine b) (flipped b m))
+    (mym, toFlip) = head' (validMoves newb)
+    head' [] = (Move (-1) (-1), []) -- pass
+    head' xs = (\(a, b) -> (boardPosToMyMove a, b))  (head xs)
 
 parseOneMove :: String -> (OpponentsMove, Time)
 parseOneMove = (\[l1, l2, l3] -> ((Move l1 l2), Time l3)) .
---                 ((map read) . words)
-                ((map read) . words) . (\x -> trace ("Sam got: " ++ show x) x)
+                 ((map read) . words)
 
 boardPosToMyMove :: BoardPosIndex -> MyMove
 boardPosToMyMove n = Move (n `mod` 8) (n `div` 8)
@@ -106,28 +53,14 @@ playString initBoard rawInput = unlines $ map formatMyMove myMoves
        (_finalBoard, myMoves) = play initBoard opponentsMoves
 
 play :: Board -> [OpponentsMove] -> (Board, [MyMove])
-play = mapAccumL oneMove
+play initBoard opponentsMoves = mapAccumL oneMove initBoard opponentsMoves
 
-explicitPlay :: Board -> [OpponentsMove] -> (Board, [(Board, MyMove)])
-explicitPlay = explicitMapAccumL oneMove
-
-explicitMapAccumL :: (acc -> x -> (acc, y)) -> acc -> [x] -> (acc, [(acc, y)])
-explicitMapAccumL f = mapAccumL f' where
-  f' acc x = let (acc', y) = f acc x in (acc', (acc, y))
-
-initialWBoard :: Board -- Board with starting configuration for white
-initialWBoard = Board
+initialBoard :: Board -- Board with starting configuration
+initialBoard = Board
   (foldr (flip setBit) (0 :: Word64) (map (\(a, b) -> a + 8*b)
                                           [(3, 3), (4, 3), (3, 4), (4, 4)]))
   (foldr (flip setBit) (0 :: Word64) (map (\(a, b) -> a + 8*b)
                                           [(3, 3), (4, 4)]))
-
-initialBBoard :: Board -- Board with starting configuration for black
-initialBBoard = Board
-  (foldr (flip setBit) (0 :: Word64) (map (\(a, b) -> a + 8*b)
-                                          [(3, 3), (4, 3), (3, 4), (4, 4)]))
-  (foldr (flip setBit) (0 :: Word64) (map (\(a, b) -> a + 8*b)
-                                          [(3, 4), (4, 3)]))
 
 boardWFirstMove :: Board -- Board with first move (3, 2)
 boardWFirstMove = Board
@@ -135,27 +68,14 @@ boardWFirstMove = Board
          (map (\(a, b) -> a + 8*b) [(3, 2), (3, 3), (4, 3), (3, 4), (4, 4)]))
   (foldr (flip setBit) (0 :: Word64)
          (map (\(a, b) -> a + 8*b) [(3, 2), (3, 4)]))
-
-{-
+  
 firstMove :: MyMove
 firstMove = Move 3 2
--}
 
---processMove :: Move -> BoardPosIndex
---processMove (Move x y) = 8*y + x
+processMove :: Move -> BoardPosIndex
+processMove (Move x y) = 8*y + x
 
-checkValid :: Move -> Move
-checkValid m@(Move x y) | 0 <= x && x < 8 && 0 <= y && y < 8 = m
-                        | otherwise = error $ "bad move: " ++ show m
-
-setMoveBit :: Word64 -> Move -> Word64
-setMoveBit w (Move (-1) (-1)) = w
-setMoveBit w m = setBit w $ moveIndex $ checkValid m
-
-moveIndex :: Move -> BoardPosIndex
-moveIndex (Move x y) = (8*y + x)
-
--- notDone = error . ("NotDone: " ++)
+notDone = error . ("NotDone: " ++)
 
 validMoves :: Board -> [(BoardPosIndex, [BoardPosIndex])]
 validMoves b = filter (\(k, _) -> not (testBit (filled b) k)) $ concat $ map
@@ -163,7 +83,7 @@ validMoves b = filter (\(k, _) -> not (testBit (filled b) k)) $ concat $ map
                                                    (testBit (filled b) i))) $
                          filter (\xs -> (xs /= []) &&
                                         (testBit (filled b) (head xs))) $
-                                map (map moveIndex)
+                                map (map processMove)
                                     (directions (boardPosToMyMove j))) $
   filter (testBit (mine b)) [0..63]
 
@@ -174,7 +94,7 @@ flipped b mov = concat $ map (\(_, xs) -> xs) $ filter
   catMaybes $ map (takeWhileAndAfter (\i -> (testBit (mine b) i))) $
                   filter (\xs -> (xs /= []) &&
                                  (testBit (filled b) (head xs))) $
-                         map (map moveIndex) (directions mov)
+                         map (map processMove) (directions mov)
 
 directions :: Move -> [[Move]]
 directions m = map
@@ -190,17 +110,11 @@ takeWhileAndAfter f xs | b == []   = Nothing
                        | otherwise = Just (head b, a)
   where (a, b) = span f xs
 
-{-
 test :: (Board, [MyMove])
 test = play boardWFirstMove [Move 2 2, Move 2 4,
                              Move 5 4, Move 4 2,
                              Move 7 6, Move 4 5]
--}
 
-test = putStr $ unlines $ map show incr ++ [show final]
-  where (final, incr) = explicitPlay boardWFirstMove [Move 2 2, Move 2 4,
-                                                      Move 5 4, Move 4 2,
-                                                      Move 7 6, Move 4 5]
 
 
 -- adjacentSquares :: Int -> [Int]
