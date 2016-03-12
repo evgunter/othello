@@ -67,7 +67,7 @@ pickMove f xs = (\(i, is) -> (boardPosToMyMove i, is)) $ f xs
 
 currentStrategy :: [(BoardPosIndex, [BoardPosIndex])] ->
                     (BoardPosIndex, [BoardPosIndex])
-currentStrategy = greedy
+currentStrategy = greedyCorners
 
 simple :: [(BoardPosIndex, [BoardPosIndex])] ->
            (BoardPosIndex, [BoardPosIndex])
