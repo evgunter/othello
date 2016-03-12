@@ -13,8 +13,8 @@ all: $(PLAYERNAME) testgame testminimax
 $(PLAYERNAME): Player.hs
 	$(HMAKEEXEC) Player.hs
 
-testminimax:
-	$(HMAKEEXEC) TestMiniMax.hs
+#testminimax:
+#	$(HMAKEEXEC) TestMiniMax.hs
 
 testgame: testgame.o
 	$(CC) -o $@ $^
