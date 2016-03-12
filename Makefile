@@ -8,7 +8,7 @@ PLAYERNAME  = Sam # Random bland human names = best team names
 CC          = g++
 CFLAGS      = -Wall -ansi -pedantic -ggdb
 
-all: $(PLAYERNAME) testgame testminimax
+all: $(PLAYERNAME) testgame #testminimax
 
 $(PLAYERNAME): Player.hs
 	$(HMAKEEXEC) Player.hs
@@ -29,6 +29,6 @@ cleanjava:
 	make -C java/ clean
 
 clean:
-	rm -f *.o $(PLAYERNAME) testgame testminimax
+	rm -f *.o $(PLAYERNAME) testgame #testminimax
 
 .PHONY: java
