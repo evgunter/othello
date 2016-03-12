@@ -35,7 +35,7 @@ oneMove b m = (Board (setBit (filled newb) (processMove mym))
                  (foldr (flip clearBit) (mine b) (flipped b m))
     (mym, toFlip) = head' (validMoves newb)
     head' [] = (Move (-1) (-1), []) -- pass
-    head' xs = (\(a, b) -> (boardPosToMyMove a, b))  (head xs)
+    head' xs = (\(i, j) -> (boardPosToMyMove i, j))  (head xs)
 
 parseOneMove :: String -> (OpponentsMove, Time)
 parseOneMove = (\[l1, l2, l3] -> ((Move l1 l2), Time l3)) .
@@ -75,7 +75,7 @@ firstMove = Move 3 2
 processMove :: Move -> BoardPosIndex
 processMove (Move x y) = 8*y + x
 
-notDone = error . ("NotDone: " ++)
+-- notDone = error . ("NotDone: " ++)
 
 validMoves :: Board -> [(BoardPosIndex, [BoardPosIndex])]
 validMoves b = filter (\(k, _) -> not (testBit (filled b) k)) $ concat $ map
