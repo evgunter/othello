@@ -72,6 +72,7 @@ public class WrapperPlayer implements OthelloPlayer {
             } else {
                 bw.write(opponentsMove.getX() + " " + opponentsMove.getY()
                     + " " + millisLeft + "\n");
+		System.out.println("opponent: " + opponentsMove.getX() + " " + opponentsMove.getY()); // ADDED
             }
             bw.flush();
             
@@ -96,6 +97,7 @@ public class WrapperPlayer implements OthelloPlayer {
                 return null;
             } else {
                 String[] parts = line.split(" ");
+		System.out.println("me: " + parts[0] + " " + parts[1]); // ADDED
                 return new Move(Integer.parseInt(parts[0]),
                     Integer.parseInt(parts[1]));
             }            
