@@ -1,6 +1,6 @@
 HC         = ghc
 STATIC_ARGS = -static -optl-static -optc-static -optl-pthread
-STATIC_ARGS =
+# STATIC_ARGS =
 HFLAGS     = -O2 -Wall $(STATIC_ARGS) --make
 HMAKEEXEC  = $(HC) -o $@ $(HFLAGS)
 PLAYERNAME  = Sam # Random bland human names = best team names
