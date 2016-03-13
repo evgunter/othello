@@ -50,14 +50,19 @@ oneMove :: Board -> OpponentsMove -> (Board, MyMove)
 oneMove b m = trace ("oneMove: opponent: " ++ show m)
                     (newerBoard, trace traceString mym)
   where
-    newb =  Board (setMoveBit (filled b)  m)
-                  (foldr (flip clearBit) (mine b) (flipped b m))
-    (mym, toFlip) = pickMove currentStrategy (validMoves newb)
-    newerBoard = Board (setMoveBit (filled newb) mym)
-                     (foldr (flip setBit)
-                            (setMoveBit (mine newb) mym) toFlip)
-    traceString = "oneMove: mine: " ++ show mym
+    newb          = doOpponentsMove    b (m,  (flipped b m))
+    (mym, toFlip) = pickMove (flip currentStrategy newb) (validMoves newb)
+    newerBoard    = doMyMove        newb (mym, toFlip      )
+    traceString   = "oneMove: mine: " ++ show mym
                   ++ "\npost-my-move board:" ++ show [filled newerBoard, mine newerBoard] ++ "\n" ++ show newerBoard
+
+doMyMove :: Board -> (MyMove, [BoardPosIndex]) -> Board
+doMyMove b (m, toFlip) = Board (setMoveBit (filled b) m)
+                               (foldr (flip setBit)
+                                      (setMoveBit (mine b) m) toFlip)
+doOpponentsMove :: Board -> (OpponentsMove, [BoardPosIndex]) -> Board
+doOpponentsMove b (m, toFlip) = Board (setMoveBit (filled b)  m)
+                                      (foldr (flip clearBit) (mine b) toFlip)
 
 pickMove :: ([(BoardPosIndex, [BoardPosIndex])] ->
               (BoardPosIndex, [BoardPosIndex])) ->
@@ -65,24 +70,24 @@ pickMove :: ([(BoardPosIndex, [BoardPosIndex])] ->
 pickMove _ [] = (Move (-1) (-1), []) -- pass
 pickMove f xs = (\(i, is) -> (boardPosToMyMove i, is)) $ f xs
 
-currentStrategy :: [(BoardPosIndex, [BoardPosIndex])] ->
+currentStrategy :: [(BoardPosIndex, [BoardPosIndex])] -> Board ->
                     (BoardPosIndex, [BoardPosIndex])
-currentStrategy = greedyCorners
+currentStrategy = minimaxWrap
 
-simple :: [(BoardPosIndex, [BoardPosIndex])] ->
+simple :: [(BoardPosIndex, [BoardPosIndex])] -> Board ->
            (BoardPosIndex, [BoardPosIndex])
-simple = head
+simple xs _ = head xs
 
-greedy :: [(BoardPosIndex, [BoardPosIndex])] ->
+greedy :: [(BoardPosIndex, [BoardPosIndex])] -> Board ->
            (BoardPosIndex, [BoardPosIndex])
-greedy = maximumBy best
+greedy xs _ = maximumBy best xs
   where best (a, as) (b, bs) | length as >  length bs = GT
                              | length as == length bs = EQ
                              | otherwise              = LT
 
-greedyCorners :: [(BoardPosIndex, [BoardPosIndex])] ->
+greedyCorners :: [(BoardPosIndex, [BoardPosIndex])] -> Board ->
                   (BoardPosIndex, [BoardPosIndex])
-greedyCorners = maximumBy best
+greedyCorners xs _ = maximumBy best xs
   where best (a, as) (b, bs) | a `elem` corners       = GT
                              | b `elem` corners       = LT
                              | a `elem` cornerDiag    = LT
@@ -93,15 +98,85 @@ greedyCorners = maximumBy best
                              | otherwise              = LT
                              --no EQ because unnecessary
 
+minimaxWrap :: [(BoardPosIndex, [BoardPosIndex])] -> Board ->
+                  (BoardPosIndex, [BoardPosIndex])
+minimaxWrap _ b = minimax b depth
+
+minimax :: Board -> Int -> (BoardPosIndex, [BoardPosIndex])
+minimax b 0 = (\(a, as) -> (moveIndex        a, as)) $ maximumBy best $ map
+              (\(a, as) -> (boardPosToMyMove a, as)) $ validMoves b
+  where best i j | (eval (doMyMove b i)) > (eval (doMyMove b j)) = GT
+                 | otherwise                                     = LT
+--minimax b i =
+
+-- this heuristic function is based on https://kartikkukreja.wordpress.com/2013/03/30/heuristic-function-for-reversiothello/
+-- in particular, the relative weightings are copied directly.
+eval :: Board -> Double
+eval (Board f m) = 10 * totalTiles + 801.724 * corners + 382.026 * cornerNext
+  where
+  totalTiles = 100 * (fromIntegral (2*(popCount m) - (popCount f)))
+                   / (fromIntegral (popCount f))
+  corners    =  fromIntegral $
+      25 * (2 *  sum (map true1False0
+                          [(testBit m  0       ), (testBit m  7      ),
+                           (testBit m (8*7)    ), (testBit m (8*7 + 7))])
+              -  sum (map true1False0
+                          [(testBit f  0       ), (testBit f  7      ),
+                           (testBit f (8*7)    ), (testBit f (8*7 + 7))]))
+  cornerNext = 
+    (-12.5) * (fromIntegral
+               ((true1False0 (testBit f  0       )) *
+           (2 * (sum (map true1False0
+                          [(testBit m  1       ), (testBit m  8      ),
+                           (testBit m  9       )]))
+              - (sum (map true1False0
+                          [(testBit f  1       ), (testBit f  8      ),
+                           (testBit m  9       )])))
+            +  (true1False0 (testBit f  7       )) *
+           (2 * (sum (map true1False0
+                          [(testBit m  6       ), (testBit m (8*1 + 6)),
+                           (testBit m (8*1 + 1))]))
+              - (sum (map true1False0
+                          [(testBit f  6       ), (testBit f (8*1 + 6)),
+                           (testBit f (8*1 + 1))])))
+            +  (true1False0 (testBit f (8*7    ))) *
+           (2 * (sum (map true1False0
+                          [(testBit m (8*6)    ), (testBit m (8*6 + 1)),
+                           (testBit m (8*7 + 1))]))
+              - (sum (map true1False0
+                          [(testBit f (8*6)    ), (testBit f (8*6 + 1)),
+                           (testBit f (8*7 + 1))])))
+            +  (true1False0 (testBit f (8*7 + 7))) *
+           (2 * (sum (map true1False0
+                          [(testBit m (8*6 + 7)), (testBit m (8*6 + 6)),
+                           (testBit m (8*7 + 6))]))
+              - (sum (map true1False0
+                          [(testBit f (8*6 + 7)), (testBit f (8*6 + 6)),
+                           (testBit f (8*7 + 6))])))))
+  mobility = 100 * (lm - lo) / (lm + lo) where
+    lm = fromIntegral $ length $ validMoves $ Board f m
+    lo = fromIntegral $ length $ validMoves $ Board f (complement m)
+  true1False0 b = if b then 1 else 0
+
+depth :: Int
+depth = 0
+
 corners :: [BoardPosIndex]
-corners = map (\(x, y) -> 8*y + x) [(0, 0), (0, 7), (7, 0), (7, 7)]
+corners = map tupleToBoardIndex [(0, 0), (0, 7), (7, 0), (7, 7)]
 
 cornerDiag :: [BoardPosIndex]
-cornerDiag = map (\(x, y) -> 8*y + x) [(1, 1), (1, 6), (6, 1), (6, 6)]
+cornerDiag = map tupleToBoardIndex [(1, 1), (1, 6), (6, 1), (6, 6)]
 
 cornerEdge :: [BoardPosIndex]
-cornerEdge = map (\(x, y) -> 8*y + x) [(0, 1), (1, 0), (0, 6), (6, 0), (1, 7),
-                                       (7, 1), (6, 7), (7, 6)]
+cornerEdge = map tupleToBoardIndex [(0, 1), (1, 0), (0, 6), (6, 0), (1, 7),
+                                    (7, 1), (6, 7), (7, 6)]
+
+edges :: [BoardPosIndex]
+edges = map tupleToBoardIndex $ concat $ map
+   (\n -> [(0, n), (7, n), (n, 0), (n, 7)]) [0..7]
+
+tupleToBoardIndex :: (Int, Int) -> BoardPosIndex
+tupleToBoardIndex (x, y) = 8*y + x
 
 parseOneMove :: String -> (OpponentsMove, Time)
 parseOneMove = (\[l1, l2, l3] -> ((Move l1 l2), Time l3)) .
