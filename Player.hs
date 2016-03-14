@@ -135,7 +135,7 @@ eval b@(Board f m) = 10 * totalTiles + 801.724 * cornersOcc +
               - (sum (map true1False0
                           [(testBit f (8*6 + 7)), (testBit f (8*6 + 6)),
                            (testBit f (8*7 + 6))])))))
-  mobility = 100 * (lm - lo) / (lm + lo) where
+  mobility = if (lm + lo) == 0 then 0 else 100 * (lm - lo) / (lm + lo) where
     lm = fromIntegral $ length $ validMoves $           b
     lo = fromIntegral $ length $ validMoves $ flipBoard b
   true1False0 bool = if bool then 1 else 0
@@ -227,6 +227,9 @@ takeWhileAndAfter f xs | b == []   = Nothing
 
 popCount' :: Bits a => a -> Int
 popCount' x = length $ filter id $ map (testBit x) [0 .. (bitSize x) - 1]
+
+testPassError :: Board
+testPassError = Board 18427885250269937407 18410874641327652607
 
 {-
 testdiagonal :: Board
