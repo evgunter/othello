@@ -43,8 +43,10 @@ oneMove b m = trace ("oneMove: opponent: " ++ show m)
                     (newerBoard, trace traceString mym)
   where
     newb          = doOpponentsMove    b (m,  (flipped b m))
-    (mym, toFlip) = pickMove (flip currentStrategy newb) (validMoves newb)
-    newerBoard    = doMyMove        newb (mym, toFlip      )
+    (mym, toFlip) = pickMove (flip currentStrategy newb) $ emptyToPass $
+                      map (\(a, as) -> (boardPosToMyMove a, as))
+                          (validMoves newb)
+    newerBoard    = doMyMove newb (mym, toFlip)
     traceString   = "oneMove: mine: " ++ show mym
                   ++ "\npost-my-move board:" ++ show [filled newerBoard, mine newerBoard] ++ "\n" ++ show newerBoard
 
@@ -56,19 +58,19 @@ doOpponentsMove :: Board -> (OpponentsMove, [BoardPosIndex]) -> Board
 doOpponentsMove b (m, toFlip) = Board (setMoveBit (filled b)  m)
                                       (foldr (flip clearBit) (mine b) toFlip)
 
-pickMove :: ([(BoardPosIndex, [BoardPosIndex])] ->
-              (BoardPosIndex, [BoardPosIndex])) ->
-             [(BoardPosIndex, [BoardPosIndex])] -> (MyMove, [BoardPosIndex])
+pickMove :: ([(MyMove, [BoardPosIndex])] ->
+              (MyMove, [BoardPosIndex])) ->
+             [(MyMove, [BoardPosIndex])] -> (MyMove, [BoardPosIndex])
 pickMove _ [] = (Move (-1) (-1), []) -- pass
-pickMove f xs = (\(i, is) -> (boardPosToMyMove i, is)) $ f xs
+pickMove f xs = f xs
 
-currentStrategy :: [(BoardPosIndex,          [BoardPosIndex])] -> Board ->
-                    (BoardPosIndex, [BoardPosIndex])
+currentStrategy :: [(MyMove, [BoardPosIndex])] -> Board ->
+                    (MyMove, [BoardPosIndex])
 currentStrategy = minimaxWrap
 
-minimaxWrap :: [(BoardPosIndex, [BoardPosIndex])] -> Board ->
-                  (BoardPosIndex, [BoardPosIndex])
-minimaxWrap _ b = (\(a, as) -> (moveIndex a, as)) $ fst $ minimax b depth
+minimaxWrap :: [(MyMove, [BoardPosIndex])] -> Board ->
+                  (MyMove, [BoardPosIndex])
+minimaxWrap _ b = fst $ minimax b depth
 
 minimax :: Board -> Int -> ((Move, [BoardPosIndex]), Double)
 minimax b i
