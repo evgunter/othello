@@ -14,6 +14,7 @@ type BoardPosIndex = Int
 data Board         = Board { filled :: !Word64, mine :: !Word64 }
                    deriving (Eq, Ord)
 data Time          = Time Int
+data Tree a        = Branches [Tree a] | Leaf a deriving (Eq, Ord, Show)
 
 instance Show Board where
  show (Board filled mine) = unlines $ groupsOf 8
@@ -105,15 +106,25 @@ minimaxWrap _ b = (\(a, as) -> (moveIndex a, as)) $ fst $ minimax b depth
 minimax :: Board -> Int -> ((Move, [BoardPosIndex]), Double)
 minimax b i
   | i == 0    = maximumBy rank $ map
-                  (\m -> (m, eval (doMyMove b m))) $
-                  (\e -> if e == [] then [(Move (-1) (-1), [])] else e) $
+                  (\m -> (m, eval (doMyMove b m))) $ emptyToPass $
                     map (\(a, as) -> (boardPosToMyMove a, as)) $ validMoves b
-  | otherwise = minimumBy rank $ map
-      ((\(firstLayer, (_, value)) -> (firstLayer, value)) .
-       (\firstLayer -> (firstLayer, minimax (flipBoard ((doMyMove b)
-                                                        firstLayer)) (i - 1)))) $ map (\(a, as) -> (boardPosToMyMove a, as)) $ validMoves b
+  | otherwise = maximumBy rank $ map
+     ((\(firstLayer, (_, value)) -> (firstLayer, (- value))) .
+      (\firstLayer -> (firstLayer, minimax (flipBoard ((doMyMove b)
+                                                       firstLayer)) (i - 1))))
+     $ emptyToPass $ map (\(a, as) -> (boardPosToMyMove a, as)) $ validMoves b
   where rank (_, z) (_, w) | z > w     = GT
                            | otherwise = LT
+
+emptyToPass :: [(Move, [BoardPosIndex])] -> [(Move, [BoardPosIndex])]
+emptyToPass [] = [(Move (-1) (-1), [])]
+emptyToPass x  = x
+
+{-
+games :: Board -> Tree
+games b | validMoves b == [] && validMoves (flipBoard b) == [] = b
+        | -}
+
 
 -- this heuristic function is based on https://kartikkukreja.wordpress.com/2013/03/30/heuristic-function-for-reversiothello/
 -- in particular, the relative weightings are copied directly.
@@ -166,7 +177,7 @@ eval b@(Board f m) = 10 * totalTiles + 801.724 * corners +
   true1False0 b = if b then 1 else 0
 
 depth :: Int
-depth = 2
+depth = 3
 
 corners :: [BoardPosIndex]
 corners = map tupleToBoardIndex [(0, 0), (0, 7), (7, 0), (7, 7)]
@@ -226,7 +237,8 @@ initialBBoard = Board
                                           [(3, 4), (4, 3)]))
 
 flipBoard :: Board -> Board
-flipBoard b = Board (filled b) (complement (mine b))
+flipBoard b = Board fill ((complement (mine b)) .&. fill) where
+  fill = filled b
 {-
 boardWFirstMove :: Board -- Board with first move (3, 2)
 boardWFirstMove = Board
