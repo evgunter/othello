@@ -55,6 +55,7 @@ doMyMove b (m, toFlip) = Board (setMoveBit (filled b) m)
                                (foldr (flip setBit)
                                       (setMoveBit (mine b) m) toFlip)
 doOpponentsMove :: Board -> (OpponentsMove, [BoardPosIndex]) -> Board
+doOpponentsMove b (_, [])     = b
 doOpponentsMove b (m, toFlip) = Board (setMoveBit (filled b)  m)
                                       (foldr (flip clearBit) (mine b) toFlip)
 
@@ -141,9 +142,6 @@ eval b@(Board f m) = 10 * totalTiles + 801.724 * cornersOcc +
 
 depth :: Int
 depth = 4
-
-tupleToBoardIndex :: (Int, Int) -> BoardPosIndex
-tupleToBoardIndex (x, y) = 8*y + x
 
 parseOneMove :: String -> (OpponentsMove, Time)
 parseOneMove = (\[l1, l2, l3] -> ((Move l1 l2), l3)) .
@@ -233,6 +231,9 @@ popCount' x = length $ filter id $ map (testBit x) [0 .. (bitSize x) - 1]
 {-
 testdiagonal :: Board
 testdiagonal = Board (35978936582144 + 2^(4+5*8)) 35390664998912
+
+tupleToBoardIndex :: (Int, Int) -> BoardPosIndex
+tupleToBoardIndex (x, y) = 8*y + x
 
 simple :: [(BoardPosIndex, [BoardPosIndex])] -> Board ->
            (BoardPosIndex, [BoardPosIndex])
