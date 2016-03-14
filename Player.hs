@@ -177,7 +177,7 @@ eval b@(Board f m) = 10 * totalTiles + 801.724 * corners +
   true1False0 b = if b then 1 else 0
 
 depth :: Int
-depth = 4
+depth = 5
 
 corners :: [BoardPosIndex]
 corners = map tupleToBoardIndex [(0, 0), (0, 7), (7, 0), (7, 7)]
