@@ -228,10 +228,13 @@ takeWhileAndAfter f xs | b == []   = Nothing
 popCount' :: Bits a => a -> Int
 popCount' x = length $ filter id $ map (testBit x) [0 .. (bitSize x) - 1]
 
-testPassError :: Board
+{-
+testPassError' :: Board
+testPassError' = Board 5417840316194575 284872480853775
+
+testPassError :: Board --was actually zero division error
 testPassError = Board 18427885250269937407 18410874641327652607
 
-{-
 testdiagonal :: Board
 testdiagonal = Board (35978936582144 + 2^(4+5*8)) 35390664998912
 
