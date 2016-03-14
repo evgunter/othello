@@ -70,7 +70,7 @@ pickMove :: ([(BoardPosIndex, [BoardPosIndex])] ->
 pickMove _ [] = (Move (-1) (-1), []) -- pass
 pickMove f xs = (\(i, is) -> (boardPosToMyMove i, is)) $ f xs
 
-currentStrategy :: [(BoardPosIndex, [BoardPosIndex])] -> Board ->
+currentStrategy :: [(BoardPosIndex,          [BoardPosIndex])] -> Board ->
                     (BoardPosIndex, [BoardPosIndex])
 currentStrategy = minimaxWrap
 
@@ -100,19 +100,18 @@ greedyCorners xs _ = maximumBy best xs
 
 minimaxWrap :: [(BoardPosIndex, [BoardPosIndex])] -> Board ->
                   (BoardPosIndex, [BoardPosIndex])
-minimaxWrap _ b = fst $ minimax b depth
+minimaxWrap _ b = (\(a, as) -> (moveIndex a, as)) $ fst $ minimax b depth
 
-minimax :: Board -> Int -> ((BoardPosIndex, [BoardPosIndex]), Double)
+minimax :: Board -> Int -> ((Move, [BoardPosIndex]), Double)
 minimax b i
-  | i == 0    = maximumBy rank $ map (\(a, as) ->
-                  ((a, as), eval (doMyMove b ((boardPosToMyMove a), as)))) $
-                                     validMoves b
+  | i == 0    = maximumBy rank $ map
+                  (\m -> (m, eval (doMyMove b m))) $
+                  (\e -> if e == [] then [(Move (-1) (-1), [])] else e) $
+                    map (\(a, as) -> (boardPosToMyMove a, as)) $ validMoves b
   | otherwise = minimumBy rank $ map
-      ((\((_, value), firstLayer) -> (firstLayer, value)) .
-       (\(move, toFlip) -> (minimax (flipBoard ((doMyMove b)
-                                    (boardPosToMyMove move, toFlip))) (i - 1),
-                            (move, toFlip)))) $
-      validMoves b
+      ((\(firstLayer, (_, value)) -> (firstLayer, value)) .
+       (\firstLayer -> (firstLayer, minimax (flipBoard ((doMyMove b)
+                                                        firstLayer)) (i - 1)))) $ map (\(a, as) -> (boardPosToMyMove a, as)) $ validMoves b
   where rank (_, z) (_, w) | z > w     = GT
                            | otherwise = LT
 
