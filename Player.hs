@@ -1,5 +1,5 @@
 import Debug.Trace (trace)
-import Data.List (mapAccumL, maximumBy, sort, groupBy)
+import Data.List (mapAccumL, maximumBy, minimumBy, sort, groupBy)
 import GHC.Word (Word64)
 import Data.Bits --many things shall hail from here
 import System.Environment (getArgs, withArgs)
@@ -100,22 +100,30 @@ greedyCorners xs _ = maximumBy best xs
 
 minimaxWrap :: [(BoardPosIndex, [BoardPosIndex])] -> Board ->
                   (BoardPosIndex, [BoardPosIndex])
-minimaxWrap _ b = minimax b depth
+minimaxWrap _ b = fst $ minimax b depth
 
-minimax :: Board -> Int -> (BoardPosIndex, [BoardPosIndex])
-minimax b 0 = (\(a, as) -> (moveIndex        a, as)) $ maximumBy best $ map
-              (\(a, as) -> (boardPosToMyMove a, as)) $ validMoves b
-  where best i j | (eval (doMyMove b i)) > (eval (doMyMove b j)) = GT
-                 | otherwise                                     = LT
---minimax b i =
+minimax :: Board -> Int -> ((BoardPosIndex, [BoardPosIndex]), Double)
+minimax b i
+  | i == 0    = maximumBy rank $ map (\(a, as) ->
+                  ((a, as), eval (doMyMove b ((boardPosToMyMove a), as)))) $
+                                     validMoves b
+  | otherwise = minimumBy rank $ map
+      ((\((_, value), firstLayer) -> (firstLayer, value)) .
+       (\(move, toFlip) -> (minimax (flipBoard ((doMyMove b)
+                                    (boardPosToMyMove move, toFlip))) (i - 1),
+                            (move, toFlip)))) $
+      validMoves b
+  where rank (_, z) (_, w) | z > w     = GT
+                           | otherwise = LT
 
 -- this heuristic function is based on https://kartikkukreja.wordpress.com/2013/03/30/heuristic-function-for-reversiothello/
 -- in particular, the relative weightings are copied directly.
 eval :: Board -> Double
-eval (Board f m) = 10 * totalTiles + 801.724 * corners + 382.026 * cornerNext
+eval b@(Board f m) = 10 * totalTiles + 801.724 * corners +
+                     382.026 * cornerNext
   where
-  totalTiles = 100 * (fromIntegral (2*(popCount m) - (popCount f)))
-                   / (fromIntegral (popCount f))
+  totalTiles = 100 * (fromIntegral (2*(popCount' m) - (popCount' f)))
+                   / (fromIntegral (popCount' f))
   corners    =  fromIntegral $
       25 * (2 *  sum (map true1False0
                           [(testBit m  0       ), (testBit m  7      ),
@@ -125,28 +133,28 @@ eval (Board f m) = 10 * totalTiles + 801.724 * corners + 382.026 * cornerNext
                            (testBit f (8*7)    ), (testBit f (8*7 + 7))]))
   cornerNext = 
     (-12.5) * (fromIntegral
-               ((true1False0 (testBit f  0       )) *
+               ((true1False0 (not (testBit f  0       ))) *
            (2 * (sum (map true1False0
                           [(testBit m  1       ), (testBit m  8      ),
                            (testBit m  9       )]))
               - (sum (map true1False0
                           [(testBit f  1       ), (testBit f  8      ),
                            (testBit m  9       )])))
-            +  (true1False0 (testBit f  7       )) *
+            +  (true1False0 (not (testBit f  7       ))) *
            (2 * (sum (map true1False0
                           [(testBit m  6       ), (testBit m (8*1 + 6)),
                            (testBit m (8*1 + 1))]))
               - (sum (map true1False0
                           [(testBit f  6       ), (testBit f (8*1 + 6)),
                            (testBit f (8*1 + 1))])))
-            +  (true1False0 (testBit f (8*7    ))) *
+            +  (true1False0 (not (testBit f (8*7    )))) *
            (2 * (sum (map true1False0
                           [(testBit m (8*6)    ), (testBit m (8*6 + 1)),
                            (testBit m (8*7 + 1))]))
               - (sum (map true1False0
                           [(testBit f (8*6)    ), (testBit f (8*6 + 1)),
                            (testBit f (8*7 + 1))])))
-            +  (true1False0 (testBit f (8*7 + 7))) *
+            +  (true1False0 (not (testBit f (8*7 + 7)))) *
            (2 * (sum (map true1False0
                           [(testBit m (8*6 + 7)), (testBit m (8*6 + 6)),
                            (testBit m (8*7 + 6))]))
@@ -154,12 +162,12 @@ eval (Board f m) = 10 * totalTiles + 801.724 * corners + 382.026 * cornerNext
                           [(testBit f (8*6 + 7)), (testBit f (8*6 + 6)),
                            (testBit f (8*7 + 6))])))))
   mobility = 100 * (lm - lo) / (lm + lo) where
-    lm = fromIntegral $ length $ validMoves $ Board f m
-    lo = fromIntegral $ length $ validMoves $ Board f (complement m)
+    lm = fromIntegral $ length $ validMoves $           b
+    lo = fromIntegral $ length $ validMoves $ flipBoard b
   true1False0 b = if b then 1 else 0
 
 depth :: Int
-depth = 0
+depth = 2
 
 corners :: [BoardPosIndex]
 corners = map tupleToBoardIndex [(0, 0), (0, 7), (7, 0), (7, 7)]
@@ -218,13 +226,16 @@ initialBBoard = Board
   (foldr (flip setBit) (0 :: Word64) (map (\(a, b) -> a + 8*b)
                                           [(3, 4), (4, 3)]))
 
+flipBoard :: Board -> Board
+flipBoard b = Board (filled b) (complement (mine b))
+{-
 boardWFirstMove :: Board -- Board with first move (3, 2)
 boardWFirstMove = Board
   (foldr (flip setBit) (0 :: Word64)
          (map (\(a, b) -> a + 8*b) [(3, 2), (3, 3), (4, 3), (3, 4), (4, 4)]))
   (foldr (flip setBit) (0 :: Word64)
          (map (\(a, b) -> a + 8*b) [(3, 2), (3, 4)]))
-
+-}
 {-
 firstMove :: MyMove
 firstMove = Move 3 2
@@ -281,17 +292,21 @@ takeWhileAndAfter f xs | b == []   = Nothing
                        | otherwise = Just (head b, a)
   where (a, b) = span f xs
 
+popCount' :: Bits a => a -> Int
+popCount' x = length $ filter id $ map (testBit x) [0 .. (bitSize x) - 1]
+
 {-
 test :: (Board, [MyMove])
 test = play boardWFirstMove [Move 2 2, Move 2 4,
                              Move 5 4, Move 4 2,
                              Move 7 6, Move 4 5]
 -}
-
+{-
 test = putStr $ unlines $ map show incr ++ [show final]
   where (final, incr) = explicitPlay boardWFirstMove [Move 2 2, Move 2 4,
                                                       Move 5 4, Move 4 2,
                                                       Move 7 6, Move 4 5]
+-}
 
 testdiagonal = Board (35978936582144 + 2^(4+5*8)) 35390664998912
 
