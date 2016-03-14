@@ -138,7 +138,7 @@ eval b@(Board f m) = 10 * totalTiles + 801.724 * cornersOcc +
   true1False0 bool = if bool then 1 else 0
 
 depth :: Int
-depth = 5
+depth = 4
 
 tupleToBoardIndex :: (Int, Int) -> BoardPosIndex
 tupleToBoardIndex (x, y) = 8*y + x
