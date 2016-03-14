@@ -56,6 +56,8 @@ doMyMove b (m, toFlip) = Board (setMoveBit (filled b) m)
                                       (setMoveBit (mine b) m) toFlip)
 doOpponentsMove :: Board -> (OpponentsMove, [BoardPosIndex]) -> Board
 doOpponentsMove b (_, [])     = b
+doOpponentsMove b (Move (-1) (-1), _) = b -- looks redundant but i'm getting
+                                          -- a weird error and it can't hurt
 doOpponentsMove b (m, toFlip) = Board (setMoveBit (filled b)  m)
                                       (foldr (flip clearBit) (mine b) toFlip)
 
@@ -227,6 +229,9 @@ takeWhileAndAfter f xs | b == []   = Nothing
 
 popCount' :: Bits a => a -> Int
 popCount' x = length $ filter id $ map (testBit x) [0 .. (bitSize x) - 1]
+
+testPassError'' :: Board
+testPassError'' = Board 296248274759515775 34494545471
 
 {-
 testPassError' :: Board
